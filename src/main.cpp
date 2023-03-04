@@ -74,20 +74,21 @@ void loop()
 
     // set threshold (user) -----------------------------------------------------------------------------------------------
     bnt.read();
+
     if (bnt.changed())
     {
         if (bnt.isPressed())
         {
             if (bnt.isHeld())
             {
-                Serial.println(F("\nbutton held\n"));
-                writeThresholdInEEPROM();
+                debugMode = !debugMode;
             }
             else
             {
-                debugMode = !debugMode;
+                Serial.println(F("\nbutton held\n"));
+                writeThresholdInEEPROM();
             }
-        }
+                }
 
     } // end button reading loop
 } // end main loop
