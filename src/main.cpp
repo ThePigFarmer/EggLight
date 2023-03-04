@@ -88,7 +88,7 @@ void loop()
                 Serial.println(F("\nbutton held\n"));
                 writeThresholdInEEPROM();
             }
-                }
+        }
 
     } // end button reading loop
 } // end main loop
