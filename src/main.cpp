@@ -11,6 +11,7 @@
 #include <Wire.h>
 
 BtButton bnt(BUTTON_PIN);
+BtButton bntDebug(DEBUG_TOGGLE_PIN);
 DS3231 rtc;
 Time t;
 
@@ -24,7 +25,7 @@ uint16_t thresholdFromEEPROM();
 
 void writeEEPROM();
 void readEEPROM();
-void writeThresholdInEEPROM();
+void writeUint16InEEPROM(uint16_t data);
 
 //-------------------------------------------------------------------------------------------------
 
@@ -35,9 +36,9 @@ void setup()
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     pinMode(RELAY_PIN, OUTPUT);
 
-#ifdef DEBUG_MODE
+    // rtc.setTime(23, 46, 00);
+
     Serial.begin(115200);
-#endif
 }
 
 void loop()
@@ -46,6 +47,12 @@ void loop()
 
     uint32_t refreashRate = debugMode ? 1000 : 600000UL;
 
+    bool targetState = LOW;
+
+    light = analogRead(PHOTO_PIN);
+
+    light = map(light, 0, 1023, 1023, 0); // brighter = +, darker = -
+
     // timed loop
     if (millis() - previousMillis >= refreashRate)
     {
@@ -53,44 +60,35 @@ void loop()
 
         if (between(t.hour, startHour, endHour))
         {
-            light = analogRead(PHOTO_PIN);
-
-            light = map(light, 0, 1023, 1023, 0); // makes it easier to comprehend (at least for me)
-
             if (light < thresholdFromEEPROM())
             {
-                digitalWrite(RELAY_PIN, HIGH ^ INVERT_RELAY_PIN);
+                targetState = HIGH;
             }
             else
             {
-                digitalWrite(RELAY_PIN, LOW ^ INVERT_RELAY_PIN);
+                targetState = LOW;
             }
         }
 
-        char buffer[49];
-        sprintf(buffer, "th: %u   light: %u   time: %u:%u:%u", thresholdFromEEPROM(), light, t.hour, t.min, t.sec);
+        digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
+
+        char buffer[69];
+        sprintf(buffer, "th: %u   li: %u   startH: %u   t: %u:%u:%u    endH: %u", thresholdFromEEPROM(), light, startHour, t.hour, t.min, t.sec, endHour);
         Serial.println(buffer);
     }
 
     // set threshold (user) -----------------------------------------------------------------------------------------------
     bnt.read();
 
-    if (bnt.changed())
+    if (bnt.changedToPressed())
     {
-        if (bnt.isPressed())
-        {
-            if (bnt.isHeld())
-            {
-                debugMode = !debugMode;
-            }
-            else
-            {
-                Serial.println(F("\nbutton held\n"));
-                writeThresholdInEEPROM();
-            }
-        }
+        Serial.println(F("\nbutton pressed\n"));
+        writeUint16InEEPROM(light);
+    }
 
-    } // end button reading loop
+    bntDebug.read();
+    if (bntDebug.changedToPressed())
+        debugMode = !debugMode;
 } // end main loop
 
 // function sources --------------------------------------------------------------------------------
@@ -117,26 +115,15 @@ byte readEEPROM(int16_t i2c_address, int16_t address)
     return rcvData;
 }
 
-void writeThresholdInEEPROM()
+void writeUint16InEEPROM(uint16_t data)
 {
-#ifdef DEBUG_MODE
     Serial.println(F("\nwritting in eeprom..."));
-    Serial.print(F("   th: "));
-    Serial.print(light);
-#endif
-    uint8_t byte1 = light >> 8;
-    uint8_t byte2 = light & 0xFF;
-#ifdef DEBUG_EEPROM
-    Serial.print(F("   byte1 "));
-    Serial.print(byte1, BIN);
-    Serial.print(F("   byte2 "));
-    Serial.println(byte2, BIN);
-#endif
+
+    uint8_t byte1 = data >> 8;
+    uint8_t byte2 = data & 0xFF;
+
     writeEEPROM(EEPROM_ON_RTC_MODULE, 1, byte1);
     writeEEPROM(EEPROM_ON_RTC_MODULE, 2, byte2);
-#ifdef DEBUG_MODE
-    Serial.println(F("\nwritten in eeprom\n\n"));
-#endif
 }
 
 uint16_t thresholdFromEEPROM()
