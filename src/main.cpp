@@ -7,13 +7,12 @@
 
 #include <Arduino.h>
 #include <BtButton.h>
-#include <DS3231.h>
+#include <RTClib.h>
 #include <Wire.h>
 
 BtButton bnt(BUTTON_PIN);
 BtButton bntDebug(DEBUG_TOGGLE_PIN);
-DS3231 rtc;
-Time t;
+RTC_DS3231 rtc;
 
 bool debugMode = false;
 
@@ -23,8 +22,9 @@ uint32_t previousMillis;
 
 uint16_t thresholdFromEEPROM();
 
-void writeEEPROM();
+void initRTC();
 void readEEPROM();
+void writeEEPROM();
 void writeUint16InEEPROM(uint16_t data);
 
 //-------------------------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ void writeUint16InEEPROM(uint16_t data);
 void setup()
 {
     Wire.begin(); // rtc
+    initRTC();
     pinMode(PHOTO_PIN, INPUT_PULLUP);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     pinMode(RELAY_PIN, OUTPUT);
@@ -43,8 +44,7 @@ void setup()
 
 void loop()
 {
-    t = rtc.getTime(); // read time from the rtc
-
+    DateTime now = rtc.now();
     uint32_t refreashRate = debugMode ? 1000 : 600000UL;
 
     bool targetState = LOW;
@@ -58,7 +58,7 @@ void loop()
     {
         previousMillis = millis();
 
-        if (between(t.hour, startHour, endHour))
+        if (between(now.hour(), startHour, endHour))
         {
             if (light < thresholdFromEEPROM())
             {
@@ -72,8 +72,10 @@ void loop()
 
         digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
 
+        char timestr[9] = "hh:mm:ss";
+        Serial.println(now.toString(timestr));
         char buffer[69];
-        sprintf(buffer, "th: %u   li: %u   startH: %u   t: %u:%u:%u    endH: %u", thresholdFromEEPROM(), light, startHour, t.hour, t.min, t.sec, endHour);
+        sprintf(buffer, "th: %u   li: %u   startH: %u   t: %s    endH: %u", thresholdFromEEPROM(), light, startHour, now.toString(timestr), endHour);
         Serial.println(buffer);
     }
 
@@ -148,4 +150,25 @@ uint16_t thresholdFromEEPROM()
 #ifdef DEBUG_MODE
     Serial.println(F("done\n\n"));
 #endif
+}
+
+void initRTC()
+{
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+
+  /*
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+  */
 }
