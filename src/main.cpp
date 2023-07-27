@@ -1,6 +1,6 @@
 #include "config.h"
 
-#define between(x, a, b) (((a) <= (x)) && ((x) <= (b)))
+#define between(num, min, max) (((min) <= (num)) && ((num) < (max)))
 
 // eeprom for threshold
 #define EEPROM_ON_RTC_MODULE 0x57
@@ -45,7 +45,7 @@ void setup()
 void loop()
 {
     DateTime now = rtc.now();
-    uint32_t refreashRate = debugMode ? 1000 : 600000UL;
+    uint32_t refreshRate = debugMode ? 1000 : 600000UL;
 
     bool targetState = LOW;
 
@@ -54,7 +54,7 @@ void loop()
     light = map(light, 0, 1023, 1023, 0); // brighter = +, darker = -
 
     // timed loop
-    if (millis() - previousMillis >= refreashRate)
+    if (millis() - previousMillis >= refreshRate)
     {
         previousMillis = millis();
 
@@ -73,7 +73,6 @@ void loop()
         digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
 
         char timestr[9] = "hh:mm:ss";
-        Serial.println(now.toString(timestr));
         char buffer[69];
         sprintf(buffer, "th: %u   li: %u   startH: %u   t: %s    endH: %u", thresholdFromEEPROM(), light, startHour, now.toString(timestr), endHour);
         Serial.println(buffer);
