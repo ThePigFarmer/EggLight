@@ -29,134 +29,127 @@ void writeUint16InEEPROM(uint16_t data);
 
 //-------------------------------------------------------------------------------------------------
 
-void setup()
-{
-    Wire.begin(); // rtc
-    initRTC();
-    pinMode(PHOTO_PIN, INPUT_PULLUP);
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-    pinMode(RELAY_PIN, OUTPUT);
+void setup() {
+  Wire.begin(); // rtc
+  initRTC();
+  pinMode(PHOTO_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(RELAY_PIN, OUTPUT);
 
-    // rtc.setTime(23, 46, 00);
+  // rtc.setTime(23, 46, 00);
 
-    Serial.begin(115200);
+  Serial.begin(115200);
 }
 
-void loop()
-{
-    DateTime now = rtc.now();
-    uint32_t refreshRate = debugMode ? 1000 : 600000UL;
+void loop() {
+  DateTime now = rtc.now();
+  uint32_t refreshRate = debugMode ? 1000 : 600000UL;
+  bool targetState = LOW;
 
-    bool targetState = LOW;
+  light = analogRead(PHOTO_PIN);
 
-    light = analogRead(PHOTO_PIN);
+  light = map(light, 0, 1023, 1023, 0); // brighter = +, darker = -
 
-    light = map(light, 0, 1023, 1023, 0); // brighter = +, darker = -
+  // timed loop
+  if (millis() - previousMillis >= refreshRate) {
+    previousMillis = millis();
 
-    // timed loop
-    if (millis() - previousMillis >= refreshRate)
-    {
-        previousMillis = millis();
+    uint8_t hour = now.hour();
 
-        if (between(now.hour(), startHour, endHour))
-        {
-            if (light < thresholdFromEEPROM())
-            {
-                targetState = HIGH;
-            }
-            else
-            {
-                targetState = LOW;
-            }
-        }
-
-        digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
-
-        char timestr[9] = "hh:mm:ss";
-        char buffer[69];
-        sprintf(buffer, "th: %u   li: %u   startH: %u   t: %s    endH: %u", thresholdFromEEPROM(), light, startHour, now.toString(timestr), endHour);
-        Serial.println(buffer);
+    if (between(hour, startHour, endHour)) {
+      if (light < thresholdFromEEPROM()) {
+        targetState = HIGH;
+      } else {
+        targetState = LOW;
+      }
     }
 
-    // set threshold (user) -----------------------------------------------------------------------------------------------
-    bnt.read();
+    digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
 
-    if (bnt.changedToPressed())
-    {
-        Serial.println(F("\nbutton pressed\n"));
-        writeUint16InEEPROM(light);
-    }
+    char timestr[9] = "hh:mm:ss";
+    char buffer[69];
+    sprintf(buffer, "th: %u   li: %u   startH: %u   t: %s    endH: %u",
+            thresholdFromEEPROM(), light, startHour, now.toString(timestr),
+            endHour);
+    Serial.println(buffer);
+  }
 
-    bntDebug.read();
-    if (bntDebug.changedToPressed())
-        debugMode = !debugMode;
+  // set threshold (user)
+  // -----------------------------------------------------------------------------------------------
+  bnt.read();
+
+  if (bnt.changedToPressed()) {
+    Serial.println(F("\nbutton pressed\n"));
+    writeUint16InEEPROM(light);
+  }
+
+  bntDebug.read();
+  if (bntDebug.changedToPressed())
+    debugMode = !debugMode;
 } // end main loop
 
-// function sources --------------------------------------------------------------------------------
+// function sources
+// --------------------------------------------------------------------------------
 
-void writeEEPROM(int16_t i2c_address, int16_t address, uint8_t val)
-{
-    Wire.beginTransmission(i2c_address);
-    Wire.write((int16_t)(address >> 8));   // MSB
-    Wire.write((int16_t)(address & 0xFF)); // LSB
-    Wire.write(val);
-    Wire.endTransmission();
-    delay(5);
+void writeEEPROM(int16_t i2c_address, int16_t address, uint8_t val) {
+  Wire.beginTransmission(i2c_address);
+  Wire.write((int16_t)(address >> 8));   // MSB
+  Wire.write((int16_t)(address & 0xFF)); // LSB
+  Wire.write(val);
+  Wire.endTransmission();
+  delay(5);
 }
 
-byte readEEPROM(int16_t i2c_address, int16_t address)
-{
-    byte rcvData = 0xFF;
-    Wire.beginTransmission(i2c_address);
-    Wire.write((int16_t)(address >> 8));   // MSB
-    Wire.write((int16_t)(address & 0xFF)); // LSB
-    Wire.endTransmission();
-    Wire.requestFrom(i2c_address, 1);
-    rcvData = Wire.read();
-    return rcvData;
+byte readEEPROM(int16_t i2c_address, int16_t address) {
+  byte rcvData = 0xFF;
+  Wire.beginTransmission(i2c_address);
+  Wire.write((int16_t)(address >> 8));   // MSB
+  Wire.write((int16_t)(address & 0xFF)); // LSB
+  Wire.endTransmission();
+  Wire.requestFrom(i2c_address, 1);
+  rcvData = Wire.read();
+  return rcvData;
 }
 
-void writeUint16InEEPROM(uint16_t data)
-{
-    Serial.println(F("\nwritting in eeprom..."));
+void writeUint16InEEPROM(uint16_t data) {
+  Serial.println(F("\nwritting in eeprom..."));
 
-    uint8_t byte1 = data >> 8;
-    uint8_t byte2 = data & 0xFF;
+  uint8_t byte1 = data >> 8;
+  uint8_t byte2 = data & 0xFF;
 
-    writeEEPROM(EEPROM_ON_RTC_MODULE, 1, byte1);
-    writeEEPROM(EEPROM_ON_RTC_MODULE, 2, byte2);
+  writeEEPROM(EEPROM_ON_RTC_MODULE, 1, byte1);
+  writeEEPROM(EEPROM_ON_RTC_MODULE, 2, byte2);
 }
 
-uint16_t thresholdFromEEPROM()
-{
+uint16_t thresholdFromEEPROM() {
 #ifdef DEBUG_MODE
-    Serial.println(F("\ngetting theshold from eeprom..."));
+  Serial.println(F("\ngetting theshold from eeprom..."));
 #endif
-    uint8_t byte1 = readEEPROM(EEPROM_ON_RTC_MODULE, 1);
-    uint8_t byte2 = readEEPROM(EEPROM_ON_RTC_MODULE, 2);
+  uint8_t byte1 = readEEPROM(EEPROM_ON_RTC_MODULE, 1);
+  uint8_t byte2 = readEEPROM(EEPROM_ON_RTC_MODULE, 2);
 #ifdef DEBUG_EEPROM
-    Serial.print(F("byte1 "));
-    Serial.print(byte1, BIN);
-    Serial.print(F("   byte2 "));
-    Serial.print(byte2, BIN);
+  Serial.print(F("byte1 "));
+  Serial.print(byte1, BIN);
+  Serial.print(F("   byte2 "));
+  Serial.print(byte2, BIN);
 #endif
-    uint16_t x = ((uint16_t)byte1 << 8) | byte2;
+  uint16_t x = ((uint16_t)byte1 << 8) | byte2;
 #ifdef DEBUG_EEPROM
-    Serial.print(F("   th "));
-    Serial.print(x);
+  Serial.print(F("   th "));
+  Serial.print(x);
 #endif
-    return x;
+  return x;
 #ifdef DEBUG_MODE
-    Serial.println(F("done\n\n"));
+  Serial.println(F("done\n\n"));
 #endif
 }
 
-void initRTC()
-{
-  if (! rtc.begin()) {
+void initRTC() {
+  if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
-    while (1) delay(10);
+    while (1)
+      delay(10);
   }
 
   /*
