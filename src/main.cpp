@@ -68,9 +68,11 @@ void loop() {
 
     char timestr[9] = "hh:mm:ss";
     char buffer[69];
-    sprintf(buffer, "th: %u   li: %u   startH: %u   t: %s    endH: %u",
-            thresholdFromEEPROM(), light, startHour, now.toString(timestr),
-            endHour);
+
+    sprintf(buffer, "t: %s, th: %u, li: %u, startH: %u, nowH: %u, endH: %u",
+            now.toString(timestr), thresholdFromEEPROM(), light, startHour,
+            hour, endHour);
+
     Serial.println(buffer);
   }
 
