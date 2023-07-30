@@ -62,6 +62,8 @@ void loop() {
       } else {
         targetState = LOW;
       }
+    } else {
+      targetState = LOW;
     }
 
     digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
