@@ -56,17 +56,13 @@ void loop() {
 
     uint8_t hour = now.hour();
 
-    if (between(hour, startHour, endHour)) {
-      if (light < thresholdFromEEPROM()) {
-        targetState = HIGH;
-      } else {
-        targetState = LOW;
-      }
+    if (between(hour, startHour, endHour) && (light < thresholdFromEEPROM())) {
+      targetState = HIGH;
     } else {
       targetState = LOW;
     }
 
-    digitalWrite(RELAY_PIN, targetState ^ INVERT_RELAY_PIN);
+    digitalWrite(RELAY_PIN, !targetState);
 
     char timestr[9] = "hh:mm:ss";
     char buffer[69];
