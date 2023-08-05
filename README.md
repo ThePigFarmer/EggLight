@@ -1,5 +1,7 @@
 # EggLight
 
+To the best of my knowledge, this code works like it should.
+
 Chickens need light to produce consistently through the winter.
 
 This code is being used on a Arduino uno in my chicken house.
