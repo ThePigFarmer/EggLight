@@ -16,7 +16,7 @@ RTC_DS3231 rtc;
 
 bool debugMode = false;
 
-uint16_t light = 1023;
+uint16_t brightness = 1023;
 
 uint32_t previousMillis;
 
@@ -42,13 +42,17 @@ void setup() {
 }
 
 void loop() {
+
   DateTime now = rtc.now();
+
+  bool targetState = false; // we want it off if it shouldn't be on...
+
   uint32_t refreshRate = debugMode ? 1000 : 600000UL;
-  bool targetState = LOW;
 
-  light = analogRead(PHOTO_PIN);
+  uint16_t rawBrightness = analogRead(PHOTO_PIN);
 
-  light = map(light, 0, 1023, 1023, 0); // brighter = +, darker = -
+  uint16_t brightness =
+      map(rawBrightness, 0, 1023, 1023, 0); // make brighter == +, darker == -
 
   // timed loop
   if (millis() - previousMillis >= refreshRate) {
@@ -56,10 +60,25 @@ void loop() {
 
     uint8_t hour = now.hour();
 
-    if (between(hour, startHour, endHour) && (light < thresholdFromEEPROM())) {
-      targetState = HIGH;
+    // check hour
+    if (between(hour, startHour, endHour)) {
+      Serial.println(F("The hour is NIGH >>> Checking light levels..."));
+
+      // check brightness
+      if (brightness < thresholdFromEEPROM()) {
+        Serial.println(F("brightness < threshold >>> targetState = TRUE"));
+        targetState = true;
+      } else {
+        Serial.println(
+            F("brightness > threshold >>> targetState = FALSE")); // avoid
+                                                                  // trusting
+                                                                  // defaults
+        targetState = false;
+      }
+
     } else {
-      targetState = LOW;
+      Serial.println(F("hour is not HIGH >> targetState = FALSE"));
+      targetState = false;
     }
 
     digitalWrite(RELAY_PIN, !targetState);
@@ -68,7 +87,7 @@ void loop() {
     char buffer[69];
 
     sprintf(buffer, "t: %s, th: %u, li: %u, startH: %u, nowH: %u, endH: %u",
-            now.toString(timestr), thresholdFromEEPROM(), light, startHour,
+            now.toString(timestr), thresholdFromEEPROM(), brightness, startHour,
             hour, endHour);
 
     Serial.println(buffer);
@@ -79,8 +98,8 @@ void loop() {
   bnt.read();
 
   if (bnt.changedToPressed()) {
-    Serial.println(F("\nbutton pressed\n"));
-    writeUint16InEEPROM(light);
+    Serial.println(F("button pressed >>> writing brightness to eeprom"));
+    writeUint16InEEPROM(brightness);
   }
 
   bntDebug.read();
@@ -153,14 +172,14 @@ void initRTC() {
   }
 
   /*
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, let's set the time!");
-    // When time needs to be set on a new device, or after a power loss, the
-    // following line sets the RTC to the date & time this sketch was compiled
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  }
-  */
+//  if (rtc.lostPower()) {
+Serial.println("RTC lost power, let's set the time!");
+// When time needs to be set on a new device, or after a power loss, the
+// following line sets the RTC to the date & time this sketch was compiled
+rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+// This line sets the RTC with an explicit date & time, for example to set
+// January 21, 2014 at 3am you would call:
+// rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+// }
+ */
 }
